@@ -1,18 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
-// import Pixel from './Pixel';
+import { useEffect, useRef } from 'react';
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 
 interface PixelState {
-  x: number;
-  y: number;
-  color: string;
+  [id: string]: { id: string; x: number; y: number; color: string };
 }
 
 interface PixelsState {
-  pixels: PixelState[];
-  addPixel: (x: number, y: number, color: string) => void;
-  setColor: (x: number, y: number, color: string) => void;
+  pixels: PixelState;
+  addPixel: (id: string, x: number, y: number, color: string) => void;
+  setColor: (id: string, color: string) => void;
   clear: () => void;
 }
 
@@ -20,18 +17,17 @@ const usePixelsStore = create<PixelsState>()(
   devtools(
     persist(
       (set) => ({
-        pixels: [],
-        addPixel: (x, y, color) =>
+        pixels: {},
+        addPixel: (id, x, y, color) =>
           set((state) => ({
-            pixels: [...state.pixels, { x, y, color }],
+            pixels: Object.assign(state.pixels, { [id]: { x, y, color } }),
           })),
-        setColor: (x, y, color) =>
+        setColor: (id, color) =>
           set((state) => {
-            const pixel = state.pixels.find((p) => p.x === x && p.y === y);
-            if (pixel) pixel.color = color;
-            return { pixels: [...state.pixels] };
+            state.pixels[id].color = color;
+            return { pixels: state.pixels };
           }),
-        clear: () => set({ pixels: [] }),
+        clear: () => set({ pixels: {} }),
       }),
       {
         name: 'pixels-storage',
@@ -40,46 +36,39 @@ const usePixelsStore = create<PixelsState>()(
   )
 );
 
-const Pixel = ({ x, y }: { x: number; y: number }) => {
-  const { pixels, addPixel, setColor, clear } = usePixelsStore();
-  let pixel = pixels.find((p) => p.x === x && p.y === y);
+const defaultColor = '#fff';
+const hoverColor = ' 	#808080';
+const paintedColor = '#000';
+
+const Pixel = ({ id }: { id: string }) => {
+  const { pixels, setColor } = usePixelsStore();
+  const pixel = pixels[id];
   if (pixel) {
     let color = pixel.color;
     const pixelSize = 16;
 
-    const defaultColor = '#fff';
-    const hoverColor = ' 	#808080';
-    const paintedColor = '#000';
-
-    // const [color, setColor] = useState('#fff');
-
     const onClick = (e: any) => {
-      // setColor(paintedColor);
-      setColor(x, y, paintedColor);
+      setColor(id, paintedColor);
       e.preventDefault();
     };
 
     const onContextMenu = (e: any) => {
-      // setColor(defaultColor);
       e.preventDefault();
     };
 
     const onMouseOver = (e: any) => {
       if (e.buttons === 0 && color === defaultColor) {
-        // setColor(hoverColor);
-        setColor(x, y, hoverColor);
+        setColor(id, hoverColor);
       } else if (e.buttons === 1) {
-        // setColor(paintedColor);
-        setColor(x, y, paintedColor);
+        setColor(id, paintedColor);
       } else if (e.buttons === 2) {
-        // setColor(defaultColor);
-        setColor(x, y, defaultColor);
+        setColor(id, defaultColor);
       }
     };
 
     const onMouseLeave = () => {
       if (color === hoverColor) {
-        setColor(x, y, defaultColor);
+        setColor(id, defaultColor);
       }
     };
 
@@ -96,8 +85,8 @@ const Pixel = ({ x, y }: { x: number; y: number }) => {
         onDrop={(e) => e.preventDefault()}
         style={{
           position: 'absolute',
-          top: `${y * pixelSize}px`,
-          left: `${x * pixelSize}px`,
+          top: `${pixel.y * pixelSize}px`,
+          left: `${pixel.x * pixelSize}px`,
           backgroundColor: color,
           width: `${pixelSize}px`,
           height: `${pixelSize}px`,
@@ -108,6 +97,26 @@ const Pixel = ({ x, y }: { x: number; y: number }) => {
     );
   }
 };
+
+function colorToGrayscale(color: string): number {
+  // Remove the '#' symbol from the color string
+  const cleanColor = color.replace('#', '');
+
+  // Expand the shorthand 3-digit color to 6-digit
+  const expandedColor =
+    cleanColor.length === 3 ? cleanColor.repeat(2) : cleanColor;
+
+  // Parse the color values from the hexadecimal string
+  const red = parseInt(expandedColor.slice(0, 2), 16);
+  const green = parseInt(expandedColor.slice(2, 4), 16);
+  const blue = parseInt(expandedColor.slice(4, 6), 16);
+
+  // Calculate the grayscale value
+  const grayscale = red * 0.299 + green * 0.587 + blue * 0.114;
+
+  // Return the grayscale value rounded to the nearest integer
+  return Math.round(grayscale);
+}
 
 const Gird = () => {
   const ref = useRef<HTMLDivElement>(null);
@@ -123,22 +132,41 @@ const Gird = () => {
 
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
-        addPixel(x, y, '#fff');
+        addPixel(`${x}-${y}`, x, y, '#fff');
       }
     }
   }, []);
 
   const handleErase = () => {
-    pixels.map((pixel) => {
-      setColor(pixel.x, pixel.y, '#fff');
+    Object.keys(pixels).forEach((id) => {
+      setColor(id, '#fff');
     });
   };
 
-  const exportPixels = () => {
-    const data = pixels.map((pixel) => {
-      return [pixel.x, pixel.y, pixel.color];
+  const exportPixels = async () => {
+    let data: any = [];
+    Object.keys(pixels).forEach((id) => {
+      data.push([colorToGrayscale(pixels[id].color) / 255]);
     });
     console.log(data);
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/', {
+        method: 'POST',
+        // headers: {
+        //   'Content-Type': 'application/json',
+        // },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        console.log('Data sent successfully');
+      } else {
+        console.error('Failed to send data');
+      }
+    } catch (error) {
+      console.error('Error sending data:', error);
+    }
   };
 
   return (
@@ -146,8 +174,8 @@ const Gird = () => {
       <button onClick={handleErase}>Clear</button>
       <button onClick={exportPixels}>Export</button>
       <div ref={ref} className='grid'>
-        {pixels.map((pixel) => (
-          <Pixel key={`${pixel.x}-${pixel.y}`} x={pixel.x} y={pixel.y} />
+        {Object.keys(pixels).map((id) => (
+          <Pixel key={id} id={id} />
         ))}
       </div>
     </>

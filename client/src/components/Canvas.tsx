@@ -43,7 +43,6 @@ const DrawableCanvas = () => {
 
   const clearCanvas = () => {
     const canvas = canvasRef.current;
-    console.log('clearing canvas');
     if (canvas) {
       context?.clearRect(0, 0, canvas.width, canvas.height);
     }

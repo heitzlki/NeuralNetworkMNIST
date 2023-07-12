@@ -48,6 +48,7 @@ def nn():
     data = request.data.decode("utf-8")
     data = list(map(float, data[1:-1].split(",")))
     data = np.array(data)[:, np.newaxis]
+    np.savez("img.npz", data=data)
 
     prediction = make_predictions(data, W1, b1, W2, b2)[0]
     print(prediction)

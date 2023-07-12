@@ -2,8 +2,15 @@ import { useEffect, useRef } from 'react';
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 
+interface PixelValue {
+  id: string;
+  x: number;
+  y: number;
+  color: string;
+}
+
 interface PixelState {
-  [id: string]: { id: string; x: number; y: number; color: string };
+  [id: string]: PixelValue;
 }
 
 interface PixelsState {
@@ -24,8 +31,11 @@ const usePixelsStore = create<PixelsState>()(
           })),
         setColor: (id, color) =>
           set((state) => {
-            state.pixels[id].color = color;
-            return { pixels: state.pixels };
+            if (state.pixels[id]) {
+              state.pixels[id].color = color;
+              return { pixels: state.pixels };
+            }
+            return state;
           }),
         clear: () => set({ pixels: {} }),
       }),
@@ -38,6 +48,8 @@ const usePixelsStore = create<PixelsState>()(
 
 const defaultColor = '#fff';
 const hoverColor = ' 	#808080';
+const brushColorOne = '#404040';
+const brushColorTwo = '#7f7f7f';
 const paintedColor = '#000';
 
 const Pixel = ({ id }: { id: string }) => {
@@ -47,8 +59,71 @@ const Pixel = ({ id }: { id: string }) => {
     let color = pixel.color;
     const pixelSize = 16;
 
-    const onClick = (e: any) => {
+    const setBrushColor = (id: string) => {
       setColor(id, paintedColor);
+      // setColor(`${pixel.x + 1}-${pixel.y}`, brushColorOne);
+      // setColor(`${pixel.x - 1}-${pixel.y}`, brushColorOne);
+      // setColor(`${pixel.x}-${pixel.y + 1}`, brushColorOne);
+      // setColor(`${pixel.x}-${pixel.y - 1}`, brushColorOne);
+      // setColor(`${pixel.x + 1}-${pixel.y + 1}`, brushColorTwo);
+      // setColor(`${pixel.x - 1}-${pixel.y - 1}`, brushColorTwo);
+      // setColor(`${pixel.x + 1}-${pixel.y - 1}`, brushColorTwo);
+      // setColor(`${pixel.x - 1}-${pixel.y + 1}`, brushColorTwo);
+      let brushColorPixels = [
+        `${pixel.x + 1}-${pixel.y}`,
+        `${pixel.x - 1}-${pixel.y}`,
+        `${pixel.x}-${pixel.y + 1}`,
+        `${pixel.x}-${pixel.y - 1}`,
+        `${pixel.x + 1}-${pixel.y + 1}`,
+        `${pixel.x - 1}-${pixel.y - 1}`,
+        `${pixel.x + 1}-${pixel.y - 1}`,
+        `${pixel.x - 1}-${pixel.y + 1}`,
+      ];
+
+      brushColorPixels.map((brushColorPixel) => {
+        if (pixels[brushColorPixel]) {
+          let prevPixelColor = pixels[brushColorPixel].color;
+          if (prevPixelColor === defaultColor) {
+            setColor(brushColorPixel, brushColorOne);
+          } else if (prevPixelColor === brushColorOne) {
+            setColor(brushColorPixel, brushColorTwo);
+          } else if (prevPixelColor === brushColorTwo) {
+            setColor(brushColorPixel, paintedColor);
+          }
+        }
+      });
+
+      // brushColors.forEach((brushColor) => {
+      //   // setColor(color[0], color[1]);
+      //   if (pixels[brushColor]) {
+      //     console.log(pixels[brushColor]);
+      //     let oldPixel = pixels[brushColor];
+      //     if (oldPixel.color === defaultColor) {
+      //       setColor(brushColor, brushColorOne);
+      //     } else if (oldPixel.color === brushColorOne) {
+      //       setColor(brushColor, brushColorTwo);
+      //     } else if (oldPixel.color === brushColorTwo) {
+      //       setColor(brushColor, paintedColor);
+      //     }
+      //   }
+      //   // Object.values(pixels).map((pixel: PixelValue) => {
+      //   //   if (`${pixel.x}-${pixel.y}` == color[0]) {
+      //   //     console.log(pixel.color);
+      //   //     if (pixel.color === defaultColor) {
+      //   //       setColor(pixel.id, color[1]);
+      //   //     } else if (pixel.color === brushColorOne) {
+      //   //       setColor(pixel.id, brushColorTwo);
+      //   //     } else if (pixel.color === brushColorTwo) {
+      //   //       setColor(pixel.id, paintedColor);
+      //   //     }
+      //   //   }
+      //   // });
+      // });
+    };
+
+    const onClick = (e: any) => {
+      // setColor(id, paintedColor);
+      setBrushColor(id);
       e.preventDefault();
     };
 
@@ -60,7 +135,8 @@ const Pixel = ({ id }: { id: string }) => {
       if (e.buttons === 0 && color === defaultColor) {
         setColor(id, hoverColor);
       } else if (e.buttons === 1) {
-        setColor(id, paintedColor);
+        // setColor(id, paintedColor);
+        setBrushColor(id);
       } else if (e.buttons === 2) {
         setColor(id, defaultColor);
       }
@@ -99,20 +175,15 @@ const Pixel = ({ id }: { id: string }) => {
 };
 
 function colorToGrayscale(color: string): number {
-  // Remove the '#' symbol from the color string
   const cleanColor = color.replace('#', '');
-
-  // Expand the shorthand 3-digit color to 6-digit
   const expandedColor =
     cleanColor.length === 3 ? cleanColor.repeat(2) : cleanColor;
-
-  // Parse the color values from the hexadecimal string
   const red = parseInt(expandedColor.slice(0, 2), 16);
   const green = parseInt(expandedColor.slice(2, 4), 16);
   const blue = parseInt(expandedColor.slice(4, 6), 16);
 
   // Calculate the grayscale value
-  const grayscale = red * 0.299 + green * 0.587 + blue * 0.114;
+  const grayscale = 255 - (red * 0.299 + green * 0.587 + blue * 0.114);
 
   // Return the grayscale value rounded to the nearest integer
   return Math.round(grayscale);
@@ -146,9 +217,9 @@ const Gird = () => {
   const exportPixels = async () => {
     let data: any = [];
     Object.keys(pixels).forEach((id) => {
-      data.push([colorToGrayscale(pixels[id].color) / 255]);
+      data.push(colorToGrayscale(pixels[id].color) / 255);
     });
-    console.log(data);
+    console.dir(data);
 
     try {
       const response = await fetch('http://127.0.0.1:5000/', {

@@ -1,10 +1,10 @@
 import './App.css';
-import Grid from './components/Grid';
+import Canvas from './components/Canvas';
 
 function App() {
   return (
     <>
-      <Grid />
+      <Canvas width={400} height={400} />
     </>
   );
 }

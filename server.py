@@ -9,12 +9,13 @@ CORS(app)
 cors = CORS(app, resource={r"/*": {"origins": "*"}})
 
 
-def init_params():
-    W1 = np.random.rand(10, 784) - 0.5
-    b1 = np.random.rand(10, 1) - 0.5
-    W2 = np.random.rand(10, 10) - 0.5
-    b2 = np.random.rand(10, 1) - 0.5
-    return W1, b1, W2, b2
+def ReLU(Z):
+    return np.maximum(Z, 0)
+
+
+def softmax(Z):
+    A = np.exp(Z) / sum(np.exp(Z))
+    return A
 
 
 def forward_prop(W1, b1, W2, b2, X):
@@ -35,24 +36,22 @@ def make_predictions(X, W1, b1, W2, b2):
     return predictions
 
 
-def test_prediction(index, W1, b1, W2, b2):
-    current_image = X_train[:, index, None]
-    prediction = make_predictions(current_image, W1, b1, W2, b2)[0]
-    label = Y_train[index]
-
-
-# W1, b1, W2, b2 = init_params()
+params = np.load("params.npz")
+W1 = params["W1"]
+b1 = params["b1"]
+W2 = params["W2"]
+b2 = params["b2"]
 
 
 @app.route("/", methods=["POST"])
 def nn():
-    data = np.array(request.data.decode("utf-8"))
-    print(data)
-    print(type(data))
-    print(data.shape)
-    # W1, b1, W2, b2 = init_params()
-    # prediction = make_predictions(data, W1, b1, W2, b2)[0]
-    return "Hello World!"
+    data = request.data.decode("utf-8")
+    data = list(map(float, data[1:-1].split(",")))
+    data = np.array(data)[:, np.newaxis]
+
+    prediction = make_predictions(data, W1, b1, W2, b2)[0]
+    print(prediction)
+    return f"{prediction}"
 
 
 if __name__ == "__main__":

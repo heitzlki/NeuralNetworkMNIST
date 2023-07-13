@@ -14,6 +14,7 @@ const DrawableCanvas = () => {
       context = canvas.getContext('2d');
 
       if (context) {
+        clearCanvas();
         context.lineCap = 'round';
         context.lineJoin = 'round';
         context.lineWidth = 25;
@@ -26,8 +27,11 @@ const DrawableCanvas = () => {
     const canvas = canvasRef.current;
     if (canvas) {
       isDrawing = true;
-      context?.beginPath();
-      context?.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+      context = canvas.getContext('2d');
+      if (context) {
+        context.beginPath();
+        context.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+      }
     }
   };
 
@@ -44,10 +48,13 @@ const DrawableCanvas = () => {
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     if (canvas) {
-      context?.clearRect(0, 0, canvas.width, canvas.height);
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.fillStyle = 'white';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+      }
     }
   };
-
   const exportCanvas = async () => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -64,7 +71,9 @@ const DrawableCanvas = () => {
           const exportedPoints: number[] = [];
 
           for (let i = 0; i < imageData.length; i += 4) {
-            const normalizedValue = imageData[i + 3] / 255;
+            const grayscale =
+              255 - (imageData[i] + imageData[i + 1] + imageData[i + 2]) / 3;
+            const normalizedValue = Math.round(grayscale);
             exportedPoints.push(normalizedValue);
           }
 
@@ -73,9 +82,9 @@ const DrawableCanvas = () => {
               method: 'POST',
               body: JSON.stringify(exportedPoints),
             });
-
             if (response.ok) {
               const data = await response.json();
+
               if (data) {
                 setPrediction(data);
               }
@@ -99,7 +108,7 @@ const DrawableCanvas = () => {
         ref={canvasRef}
         width={width}
         height={height}
-        style={{ border: '1px solid #000' }}
+        style={{ border: '1px solid #000', transform: 'translateZ(0)' }}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
